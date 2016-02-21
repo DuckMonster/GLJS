@@ -4,7 +4,12 @@ var perspectiveMatrix;
 var viewMatrix;
 
 var model;
+var lightModel;
 var originModel;
+var texture;
+
+var lightDistance = 1.0;
+var lightRadius = 2.0;
 
 var canvas2D;
 
@@ -41,17 +46,31 @@ function drawScene() {
 	var u_view = program.getUniform("u_view");
 	gl.uniformMatrix4fv(u_view, false, viewMatrix.flatten());
 	
+	//UPDATE LIGHTS
+	//Ambient
+	gl.uniform1f(program.getUniform("u_ambient"), 0.3);
+	
+	//Point light
+	gl.uniform1i(program.getUniform("u_lightN"), 1);
+	gl.uniform3f(program.getUniform("u_lights[0].position"), Math.sin(rotation) * lightDistance, Math.cos(rotation) * lightDistance, 0.0);
+	gl.uniform1f(program.getUniform("u_lights[0].radius"), lightRadius);
+	
 	//DRAW MODELS
+	//Light
+	lightModel.position = $V([Math.sin(rotation) * lightDistance, Math.cos(rotation) * lightDistance, 0.0])
+	lightModel.draw();
+	
+	//Cubes
 	model.position = $V([-2, 0, 0]);
-	model.rotation = $V([rotation, 0, 0]);
+	model.rotation = $V([0, 0, rotation]);
 	model.draw();
-
+	
 	model.position = $V([0, 0, 0]);
-	model.rotation = $V([0, 0, rotation]);
+	model.rotation = $V([0, 0, 0]);
 	model.draw();
-
+	
 	model.position = $V([2, 0, 0]);
-	model.rotation = $V([0, 0, rotation]);
+	model.rotation = $V([0, rotation, rotation]);
 	model.draw();
 	//
 	
@@ -69,118 +88,47 @@ function updateSize() {
 }
 
 function initBuffers() {
-	var addFace = function (arr, verts) {
-		
-		for (var j = 0; j < 3; j++) {
-			for (var i = 0; i < 3; i++) {
-				arr.push(verts[j][i]);
-			}
-		}
-		for (var j = 1; j < 4; j++) {
-			for (var i = 0; i < 3; i++) {
-				arr.push(verts[j][i]);
-			}
-		}
-	}
-	
-	var cube = [
-		[0.5, 0.5, 0.5],
-		[-0.5, 0.5, 0.5],
-		[0.5, -0.5, 0.5],
-		[-0.5, -0.5, 0.5],
-			
-		[0.5, 0.5, -0.5],
-		[-0.5, 0.5, -0.5],
-		[0.5, -0.5, -0.5],
-		[-0.5, -0.5, -0.5]
-	]
-	
-	var v = []
-	addFace(v, [cube[0], cube[1], cube[2], cube[3]]);
-	addFace(v, [cube[2], cube[3], cube[6], cube[7]]);
-	addFace(v, [cube[0], cube[1], cube[4], cube[5]]);
-	addFace(v, [cube[4], cube[5], cube[6], cube[7]]);
-	addFace(v, [cube[5], cube[7], cube[1], cube[3]]);
-	addFace(v, [cube[0], cube[2], cube[4], cube[6]]);
-		
-	var uvs = [
-		1, 1,
-		0, 1,
-		1, 0,
-		
-		0, 1,
-		1, 0,
-		0, 0,
-		
-		1, 1,
-		0, 1,
-		1, 0,
-		
-		0, 1,
-		1, 0,
-		0, 0,
-		
-		1, 1,
-		0, 1,
-		1, 0,
-		
-		0, 1,
-		1, 0,
-		0, 0,
-		
-		1, 1,
-		0, 1,
-		1, 0,
-		
-		0, 1,
-		1, 0,
-		0, 0,
-		
-		1, 1,
-		0, 1,
-		1, 0,
-		
-		0, 1,
-		1, 0,
-		0, 0,
-		
-		1, 1,
-		0, 1,
-		1, 0,
-		
-		0, 1,
-		1, 0,
-		0, 0,
-	]
+	texture = new Texture("res/sample2.png");
 
-	model = new Model();
-	model.setVertices(v);
-	model.setUVs(uvs);
+	OBJ.load("res/thingObj.obj", function (result) {
+		model = new Model();
+		model.setVertices(result.positions);
+		model.setNormals(result.normals);
+		model.setUVs(result.uvs);
+		model.texture = texture;
+	});
 	
-	model.texture = new Texture("sample2.png");
-	
+	OBJ.load("res/lightMesh.obj", function (result) {
+		lightModel = new Model();
+		lightModel.setVertices(result.positions);
+		lightModel.setNormals(result.normals);
+		lightModel.setUVs(result.uvs);
+		
+		lightModel.scale = $V([.2, .2, .2]);
+	});
+
 	originModel = new Model();
 	originModel.setVertices([
 		0.0, 0.0, 0.0,
 		1.0, 0.0, 0.0,
-		
+
 		0.0, 0.0, 0.0,
 		0.0, 1.0, 0.0,
-		
+
 		0.0, 0.0, 0.0,
 		0.0, 0.0, 1.0
 	]);
 	originModel.setColors([
 		1, 0, 0,
 		1, 0, 0,
-		
+
 		0, 1, 0,
 		0, 1, 0,
-		
+
 		0, 0, 1,
 		0, 0, 1,
 	])
-	
+
 	originModel.mesh.vertexN = 200;
 	originModel.mesh.drawMode = gl.LINES;
 }
@@ -188,4 +136,21 @@ function initBuffers() {
 function initProgram() {
 	program = new ShaderProgram("shader-vs", "shader-fs");
 	program.use();
+}
+
+//Checkboxes
+function distanceChanged() {
+	gl.uniform1i(program.getUniform("u_expo_distance"), document.getElementById("distanceBox").checked ? 1 : 0);
+}
+
+function angleChanged() {
+	gl.uniform1i(program.getUniform("u_expo_angle"), document.getElementById("angleBox").checked ? 1 : 0);
+}
+
+function radiusChanged() {
+	lightRadius = parseFloat(document.getElementById("lightRadius").value);
+}
+
+function lightDistanceChanged() {
+	lightDistance = parseFloat(document.getElementById("lightDistance").value);
 }

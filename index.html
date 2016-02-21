@@ -9,41 +9,86 @@
 		attribute vec3 a_vertexPosition;
 		attribute vec2 a_vertexUV;
 		attribute vec3 a_vertexColor;
+		attribute vec3 a_vertexNormal;
 		
 		uniform mat4 u_projection;
 		uniform mat4 u_view;
 		uniform mat4 u_model;
+		uniform mat4 u_normal;
 		
 		varying lowp vec3 v_color;
 		varying lowp vec2 v_uv;
+		varying lowp vec3 v_normal;
 		varying lowp vec3 v_world;
 	
 		void main(void) {
 			gl_Position = u_projection * u_view * u_model * vec4(a_vertexPosition, 1.0);
 			v_color = a_vertexColor;
 			v_uv = a_vertexUV;
-			v_world = gl_Position.xyz;
+			v_normal =  (u_normal * vec4(a_vertexNormal, 1.0)).xyz;
+			v_world = (u_model * vec4(a_vertexPosition, 1.0)).xyz;
 		}
 	</script>
 	
 	<script id="shader-fs" type="x-shader/x-fragment">
+		precision lowp float;
+	
 		uniform sampler2D textureSampler;
 		uniform bool usingTexture;
 		
-		varying lowp vec3 v_color;
-		varying lowp vec2 v_uv;
-		varying lowp vec3 v_world;
+		struct PointLight {
+			vec3 position;
+			float radius;
+		};
+		
+		//LIGHTS
+		uniform float u_ambient;
+		uniform PointLight u_lights[2];
+		uniform int u_lightN;
+		
+		uniform bool u_expo_distance;
+		uniform bool u_expo_angle;
+		
+		varying vec3 v_color;
+		varying vec2 v_uv;
+		varying vec3 v_normal;
+		varying vec3 v_world;
 	
 		void main(void) {
-			if (usingTexture)			
-				gl_FragColor = texture2D(textureSampler, v_uv) * vec4(v_color, 1.0);
-			else
-				gl_FragColor = vec4(v_color, 1.0);
+		
+			//Calculate lights
+			float diffuse = 0.0;
+			
+			for(int i=0; i<2; i++) {
+				if (i >= u_lightN)
+						break;
+			
+				vec3 lightDir = normalize(v_world - u_lights[i].position);
+				float d = clamp(dot(normalize(v_normal), -lightDir), 0.0, 1.0);
+				
+				float distance = 1.0 - clamp(length(v_world - u_lights[i].position) / u_lights[i].radius, 0.0, 1.0);
+				if (u_expo_distance)
+					distance *= distance;
+				
+				if (u_expo_angle)
+					d = d*d;
+				
+				diffuse += d * distance;
+			}
+			//
+			
+			vec4 color = vec4(v_color * diffuse + v_color * u_ambient, 1.0);
+		
+			if (usingTexture)
+				color *= texture2D(textureSampler, v_uv);
+				
+			gl_FragColor = color;
 		}
 	</script>
 	
 	<script src="src/libs/sylvester.js"></script>
 	<script src="src/libs/glUtils.js"></script>
+	<script src="src/libs/objparser.js"></script>
 	
 	<script src="src/gljs/gl.js"></script>
 	<script src="src/gljs/mesh.js"></script>
@@ -58,6 +103,16 @@
 
 <body onload="main()" style="margin: 0px;" onresize="updateSize()">
 	<canvas id="glcanvas" width="50px" height="50px"></canvas>
+	<div class="checkbox">
+		<form autocomplete="off">
+			<input type="checkbox" id="distanceBox" onchange="distanceChanged()">Exponential distance
+			<input type="checkbox" id="angleBox" onchange="angleChanged()">Exponential angle
+			
+			<br><br>
+			Light Distance<input type="range" id="lightDistance" step="0.05" min=0.01 max=5.0 value="1.0" oninput="lightDistanceChanged()"><br>
+			Light Radius<input type="range" id="lightRadius" step="0.05" min=1.0 max=20.0 value="2.0" oninput="radiusChanged()">
+		</form>
+	</div>
 </body>
 
 </html>

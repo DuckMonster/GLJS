@@ -4,3 +4,16 @@ html, body {
 	height: 100%;
 	overflow: hidden;
 }
+
+.checkbox {
+	font-family: Verdana, Geneva, Tahoma, sans-serif;
+	position: absolute;
+	top: 50px;
+	left: 50px;
+	width: 200px;
+	height: 200px;
+	padding: 10px;
+	
+	background-color: rgba(40, 180, 255, 0.2);
+	color: cyan;
+}
